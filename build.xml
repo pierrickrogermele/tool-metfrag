@@ -1,0 +1,16 @@
+<project name="tool.metfrag" default="all">
+
+	<!-- ALL -->
+	<target name="all"/>
+
+	<!-- TEST -->
+	<target name="test" depends="all">
+		<ant dir="test" inheritAll="false"/>
+	</target>
+
+	<!-- CLEAN -->
+	<target name="clean" depends="all">
+		<ant dir="clean" inheritAll="false"/>
+	</target>
+
+</project>

@@ -1,0 +1,37 @@
+#	
+# data file containing mz intensity peak pairs (one per line)	
+#	
+PeakListPath = exampledata.txt	
+#	
+# database parameters -> how to retrieve candidates	
+#	
+#	
+MetFragDatabaseType = PubChem	
+NeutralPrecursorMolecularFormula = C9H11Cl3NO3PS	
+NeutralPrecursorMass = 348.926284	
+#	
+# peak matching parameters	
+#	
+FragmentPeakMatchAbsoluteMassDeviation = 0.001	
+FragmentPeakMatchRelativeMassDeviation = 5	
+PrecursorIonMode = 1	
+IsPositiveIonMode = True	
+#	
+# scoring parameters	
+#	
+MetFragScoreTypes = FragmenterScore	
+MetFragScoreWeights = 1.0	
+#	
+# output	
+# SDF, XLS, CSV, ExtendedXLS, ExtendedFragmentsXLS	
+#	
+MetFragCandidateWriter = XLS	
+SampleName = example1	
+ResultsPath = .	
+#	
+# following parameteres can be kept as they are	
+#	
+MaximumTreeDepth = 2	
+MetFragPreProcessingCandidateFilter = UnconnectedCompoundFilter	
+MetFragPostProcessingCandidateFilter = InChIKeyFilter	
+# NumberThreads = 1

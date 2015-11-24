@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# See http://c-ruttkies.github.io/MetFrag/projects/metfrag22cl/
+
+#############
+# CONSTANTS #
+#############
+
+SCRIPTDIR=$(dirname $0)
+
+####################
+# GET OPTION VALUE #
+####################
+
+function get_opt_val {
+	if [ -z "$2" ] ; then
+		printf "ERROR: \"$1\" requires a non-empty option argument.\n" >&2
+		exit 1
+	fi
+	echo $2
+}
+
+#############
+# READ ARGS #
+#############
+
+function read_args {
+	while true ; do
+		case $1 in
+			-f|--file) g_param_file=$(get_opt_val $1 $2) ; shift 2 ;;
+			*) break
+		esac
+	done
+}
+
+########
+# MAIN #
+########
+
+read_args "$@"
+
+java -jar $SCRIPTDIR/MetFrag2.2-CL.jar $g_param_file
