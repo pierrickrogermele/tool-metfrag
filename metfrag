@@ -38,11 +38,18 @@ function read_args {
 			-f|--file) g_param_file=$(get_opt_val $1 $2) ; shift ;;
 			--pubchem) g_db=PubChem ;;
 			--kegg) g_db=KEGG ;;
+			-s|--spectrum|--spectrum-file) g_spectrum_file=$(get_opt_val $1 $2) ; shift ;;
 			-?*) error "Unknown option \"$1\"." ;;
 			*) break
 		esac
 		shift
 	done
+
+	# Check parameters
+	if [ -z "$g_param_file" ] ; then
+		if [ -z "$g_spectrum_file" ] ; then error "You must specify a spectrum file through --spectrum option." ; fi
+		if [ ! -f "$g_spectrum_file" ] ; then error "Cannot find the spectrum file \"$g_spectrum_file\"." ; fi
+	fi
 }
 
 #####################
@@ -54,7 +61,7 @@ function create_param_file {
 #	
 # data file containing mz intensity peak pairs (one per line)	
 #	
-PeakListPath = exampledata.txt	
+PeakListPath = $g_spectrum_file
 #
 # Database parameters -> how to retrieve candidates	
 #	
