@@ -7,6 +7,8 @@
 #############
 
 SCRIPTDIR=$(dirname $0)
+MSPOS=pos
+MSNEG=neg
 
 #########
 # ERROR #
@@ -38,6 +40,7 @@ function read_args {
 			-f|--file) g_param_file=$(get_opt_val $1 $2) ; shift ;;
 			--pubchem) g_db=PubChem ;;
 			--kegg) g_db=KEGG ;;
+			-m|--mode) g_mode=$(get_opt_val $1 $2) ; shift ;;
 			-s|--spectrum|--spectrum-file) g_spectrum_file=$(get_opt_val $1 $2) ; shift ;;
 			-?*) error "Unknown option \"$1\"." ;;
 			*) break
@@ -47,8 +50,11 @@ function read_args {
 
 	# Check parameters
 	if [ -z "$g_param_file" ] ; then
-		if [ -z "$g_spectrum_file" ] ; then error "You must specify a spectrum file through --spectrum option." ; fi
+		if [ -z "$g_db" ] ; then error "You must select one database: --pubchem or --kegg." ; fi
+		if [ -z "$g_spectrum_file" ] ; then error "You must specify a spectrum file through -s option." ; fi
 		if [ ! -f "$g_spectrum_file" ] ; then error "Cannot find the spectrum file \"$g_spectrum_file\"." ; fi
+		if [ -z "$g_mode" ] ; then error "You must specify an MS mode through -m option." ; fi
+		if [ "$g_mode" != "$MSPOS" -a "$g_mode" != "$MSNEG" ] ; then error "MS mode must be either \"$MSPOS\" or \"$MSNEG\"." ; fi
 	fi
 }
 
