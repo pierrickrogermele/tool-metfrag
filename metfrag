@@ -8,14 +8,22 @@
 
 SCRIPTDIR=$(dirname $0)
 
+#########
+# ERROR #
+#########
+
+function error {
+	printf "ERROR: $1\n" >&2
+	exit 1
+}
+
 ####################
 # GET OPTION VALUE #
 ####################
 
 function get_opt_val {
 	if [ -z "$2" ] ; then
-		printf "ERROR: \"$1\" requires a non-empty option argument.\n" >&2
-		exit 1
+		error "\"$1\" requires a non-empty option argument."
 	fi
 	echo $2
 }
@@ -30,6 +38,7 @@ function read_args {
 			-f|--file) g_param_file=$(get_opt_val $1 $2) ; shift ;;
 			--pubchem) g_db=PubChem ;;
 			--kegg) g_db=KEGG ;;
+			-?*) error "Unknown option \"$1\"." ;;
 			*) break
 		esac
 		shift
