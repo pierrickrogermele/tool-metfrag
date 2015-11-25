@@ -14,6 +14,9 @@ MSNEG=neg
 DBPUBCHEM=pubchem
 DBKEGG=kegg
 
+OUTTYPECSV=csv
+OUTTYPEXLS=xls
+
 #########
 # ERROR #
 #########
@@ -50,6 +53,7 @@ function read_args {
 			-d|--db|--database) g_db=$(get_opt_val $1 $2) ; shift ;;
 			-m|--mode) g_mode=$(get_opt_val $1 $2) ; shift ;;
 			-s|--spectrum|--spectrum-file) g_spectrum_file=$(get_opt_val $1 $2) ; shift ;;
+			-o|--output-file) g_output_file=$(get_opt_val $1 $2) ; shift ;;
 			-?*) error "Unknown option \"$1\"." ;;
 			*) break
 		esac
@@ -58,12 +62,25 @@ function read_args {
 
 	# Check parameters
 	if [ -n "$g_generate_param_file" ] ; then
-		if [ -z "$g_db" ] ; then error "You must select a database through -d option." ; fi
-		if [ "$g_db" != "$DBPUBCHEM" -a "$g_db" != "$DBKEGG" ] ; then error "The database must one of \"$DBKEGG\" or \"$DBPUBCHEM\"." ; fi
-		if [ -z "$g_spectrum_file" ] ; then error "You must specify a spectrum file through -s option." ; fi
-		if [ ! -f "$g_spectrum_file" ] ; then error "Cannot find the spectrum file \"$g_spectrum_file\"." ; fi
-		if [ -z "$g_mode" ] ; then error "You must specify an MS mode through -m option." ; fi
-		if [ "$g_mode" != "$MSPOS" -a "$g_mode" != "$MSNEG" ] ; then error "MS mode must be either \"$MSPOS\" or \"$MSNEG\"." ; fi
+		[ -n "$g_db" ] || error "You must select a database through -d option."
+		[ "$g_db" = "$DBPUBCHEM" -o "$g_db" = "$DBKEGG" ] || error "The database must be one of \"$DBKEGG\" or \"$DBPUBCHEM\"."
+		[ -n "$g_spectrum_file" ] || error "You must specify a spectrum file through -s option."
+		[ -f "$g_spectrum_file" ] || error "Cannot find the spectrum file \"$g_spectrum_file\"."
+		[ -n "$g_mode" ] || error "You must specify an MS mode through -m option."
+		[ "$g_mode" = "$MSPOS" -o "$g_mode" = "$MSNEG" ] || error "MS mode must be either \"$MSPOS\" or \"$MSNEG\"."
+
+		# Output file
+		[ -n "$g_output_file" ] || error "You must specify an output file through -o option."
+		if [ -z "$g_output_type" ] ; then
+			ext=${g_output_file##*.}
+			case $ext in
+				csv|CSV) g_output_type=$OUTTYPECSV ;;
+				xls|XLS) g_output_type=$OUTTYPEXLS ;;
+				*) error "Unknown extension \"$ext\" for output file \"$g_output_file\"."
+			esac
+		fi
+		[ -n "$g_output_type" ] || error "You must specify an output file type through -t option."
+		[ "$g_output_type" = "$OUTTYPECSV" -o "$g_output_type" = "$OUTTYPEXLS" ] || error "The output type must be one of \"$OUTTYPECSV\" or \"$OUTTYPEXLS\"."
 	fi
 }
 
@@ -83,6 +100,20 @@ esac
 case $g_mode in
 	$MSPOS) mode=True ;;
 	$MSNEG) mode=False ;;
+esac
+
+# Get writer tag
+case $g_output_type in
+	$OUTTYPECSV) writer=CSV ;;
+	$OUTTYPEXLS) writer=XLS ;;
+esac
+
+# Output file
+output_file_name=$(basename "$g_output_tmp_file")
+output_file_dir=$(dirname "$g_output_tmp_file")
+case $g_output_type in
+	$OUTTYPECSV) g_output_tmp_file="$g_output_tmp_file.csv" ;;
+	$OUTTYPEXLS) g_output_tmp_file="$g_output_tmp_file.xls" ;;
 esac
 
 	cat >$g_param_file <<EOF
@@ -112,9 +143,9 @@ MetFragScoreWeights = 1.0
 # output	
 # SDF, XLS, CSV, ExtendedXLS, ExtendedFragmentsXLS	
 #	
-MetFragCandidateWriter = CSV
-SampleName = example1	
-ResultsPath = .	
+MetFragCandidateWriter = $writer
+SampleName = $output_file_name
+ResultsPath = $output_file_dir
 #	
 # following parameteres can be kept as they are	
 #	
@@ -139,6 +170,9 @@ function call_metfrag {
 
 read_args "$@"
 
+# Create output temp file
+g_output_tmp_file=$(mktemp -t metfrag.output.XXXXXX)
+
 if [ -n "$g_generate_param_file" ] ; then
 	[ -n "$g_param_file" ] || g_param_file=$(mktemp -t metfrag.XXXXXX)
 	create_param_file
@@ -147,3 +181,6 @@ if [ -n "$g_generate_param_file" ] ; then
 else
 	call_metfrag
 fi
+
+# Rename output temp file
+mv $g_output_tmp_file $g_output_file
