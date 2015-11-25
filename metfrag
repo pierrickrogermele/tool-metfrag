@@ -7,8 +7,12 @@
 #############
 
 SCRIPTDIR=$(dirname $0)
+
 MSPOS=pos
 MSNEG=neg
+
+DBPUBCHEM=pubchem
+DBKEGG=kegg
 
 #########
 # ERROR #
@@ -35,11 +39,15 @@ function get_opt_val {
 #############
 
 function read_args {
+
+	g_generate_param_file=yes
+	g_keep_generated_param_file=
+
 	while true ; do
 		case $1 in
-			-f|--file) g_param_file=$(get_opt_val $1 $2) ; shift ;;
-			--pubchem) g_db=PubChem ;;
-			--kegg) g_db=KEGG ;;
+			-f|--file|--param-file) g_param_file=$(get_opt_val $1 $2) ; g_generate_param_file= ; shift ;;
+			--output-param-file) g_param_file=$(get_opt_val $1 $2) ; g_keep_generated_param_file=yes ; shift ;;
+			-d|--db|--database) g_db=$(get_opt_val $1 $2) ; shift ;;
 			-m|--mode) g_mode=$(get_opt_val $1 $2) ; shift ;;
 			-s|--spectrum|--spectrum-file) g_spectrum_file=$(get_opt_val $1 $2) ; shift ;;
 			-?*) error "Unknown option \"$1\"." ;;
@@ -49,8 +57,9 @@ function read_args {
 	done
 
 	# Check parameters
-	if [ -z "$g_param_file" ] ; then
-		if [ -z "$g_db" ] ; then error "You must select one database: --pubchem or --kegg." ; fi
+	if [ -n "$g_generate_param_file" ] ; then
+		if [ -z "$g_db" ] ; then error "You must select a database through -d option." ; fi
+		if [ "$g_db" != "$DBPUBCHEM" -a "$g_db" != "$DBKEGG" ] ; then error "The database must one of \"$DBKEGG\" or \"$DBPUBCHEM\"." ; fi
 		if [ -z "$g_spectrum_file" ] ; then error "You must specify a spectrum file through -s option." ; fi
 		if [ ! -f "$g_spectrum_file" ] ; then error "Cannot find the spectrum file \"$g_spectrum_file\"." ; fi
 		if [ -z "$g_mode" ] ; then error "You must specify an MS mode through -m option." ; fi
@@ -63,6 +72,19 @@ function read_args {
 #####################
 
 function create_param_file {
+
+# Get database tag
+case $g_db in
+	$DBPUBCHEM) database=PubChem ;;
+	$DBKEGG) database=KEGG ;;
+esac
+
+# Get mode tag
+case $g_mode in
+	$MSPOS) mode=True ;;
+	$MSNEG) mode=False ;;
+esac
+
 	cat >$g_param_file <<EOF
 #	
 # data file containing mz intensity peak pairs (one per line)	
@@ -71,7 +93,7 @@ PeakListPath = $g_spectrum_file
 #
 # Database parameters -> how to retrieve candidates	
 #	
-MetFragDatabaseType = $g_db
+MetFragDatabaseType = $database
 NeutralPrecursorMolecularFormula = C9H11Cl3NO3PS	
 NeutralPrecursorMass = 348.926284	
 #	
@@ -80,7 +102,7 @@ NeutralPrecursorMass = 348.926284
 FragmentPeakMatchAbsoluteMassDeviation = 0.001	
 FragmentPeakMatchRelativeMassDeviation = 5	
 PrecursorIonMode = 1	
-IsPositiveIonMode = True	
+IsPositiveIonMode = $mode
 #	
 # scoring parameters	
 #	
@@ -117,11 +139,11 @@ function call_metfrag {
 
 read_args "$@"
 
-if [ -z "$g_param_file" ] ; then
-	g_param_file=$(mktemp -t metfrag.XXXXXX)
+if [ -n "$g_generate_param_file" ] ; then
+	[ -n "$g_param_file" ] || g_param_file=$(mktemp -t metfrag.XXXXXX)
 	create_param_file
 	call_metfrag
-	rm $g_param_file
+	[ -z "$g_keep_generated_param_file" ] && rm $g_param_file
 else
 	call_metfrag
 fi
