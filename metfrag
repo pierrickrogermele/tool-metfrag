@@ -52,6 +52,9 @@ function read_args {
 			--output-param-file) g_param_file=$(get_opt_val $1 $2) ; g_keep_generated_param_file=yes ; shift ;;
 			-d|--db|--database) g_db=$(get_opt_val $1 $2) ; shift ;;
 			-m|--mode) g_mode=$(get_opt_val $1 $2) ; shift ;;
+			--precursor-neutral-mass) g_precursor_neutral_mass=$(get_opt_val $1 $2) ; shift ;;
+			--precursor-formula) g_precursor_formula=$(get_opt_val $1 $2) ; shift ;;
+			--relative-mass-deviation) g_relative_mass_deviation=$(get_opt_val $1 $2) ; shift ;;
 			-s|--spectrum|--spectrum-file) g_spectrum_file=$(get_opt_val $1 $2) ; shift ;;
 			-o|--output-file) g_output_file=$(get_opt_val $1 $2) ; shift ;;
 			-?*) error "Unknown option \"$1\"." ;;
@@ -68,6 +71,7 @@ function read_args {
 		[ -f "$g_spectrum_file" ] || error "Cannot find the spectrum file \"$g_spectrum_file\"."
 		[ -n "$g_mode" ] || error "You must specify an MS mode through -m option."
 		[ "$g_mode" = "$MSPOS" -o "$g_mode" = "$MSNEG" ] || error "MS mode must be either \"$MSPOS\" or \"$MSNEG\"."
+		[ -n "$g_precursor_neutral_mass" ] || error "You must specify a precursor M/Z through --precursor-neutral-mass option."
 
 		# Output file
 		[ -n "$g_output_file" ] || error "You must specify an output file through -o option."
@@ -90,68 +94,72 @@ function read_args {
 
 function create_param_file {
 
-# Get database tag
-case $g_db in
-	$DBPUBCHEM) database=PubChem ;;
-	$DBKEGG) database=KEGG ;;
-esac
+	# Get database tag
+	case $g_db in
+		$DBPUBCHEM) database=PubChem ;;
+		$DBKEGG) database=KEGG ;;
+	esac
 
-# Get mode tag
-case $g_mode in
-	$MSPOS) mode=True ;;
-	$MSNEG) mode=False ;;
-esac
-
-# Get writer tag
-case $g_output_type in
-	$OUTTYPECSV) writer=CSV ;;
-	$OUTTYPEXLS) writer=XLS ;;
-esac
-
-# Output file
-output_file_name=$(basename "$g_output_tmp_file")
-output_file_dir=$(dirname "$g_output_tmp_file")
-case $g_output_type in
-	$OUTTYPECSV) g_output_tmp_file="$g_output_tmp_file.csv" ;;
-	$OUTTYPEXLS) g_output_tmp_file="$g_output_tmp_file.xls" ;;
-esac
+	# Database search param
+	[ -z "$g_precursor_formula" ] || database_search_param="NeutralPrecursorMolecularFormula = $g_precursor_formula"
+	[ -z "$g_relative_mass_deviation" ] || database_search_param="DatabaseSearchRelativeMassDeviation = $g_relative_mass_deviation"
+	
+	# Get mode tag
+	case $g_mode in
+		$MSPOS) posmode=True ; mode='+1' ;;
+		$MSNEG) posmode=False ; mode='-1' ;;
+	esac
+	
+	# Get writer tag
+	case $g_output_type in
+		$OUTTYPECSV) writer=CSV ;;
+		$OUTTYPEXLS) writer=XLS ;;
+	esac
+	
+	# Output file
+	output_file_name=$(basename "$g_output_tmp_file")
+	output_file_dir=$(dirname "$g_output_tmp_file")
+	case $g_output_type in
+		$OUTTYPECSV) g_output_tmp_file="$g_output_tmp_file.csv" ;;
+		$OUTTYPEXLS) g_output_tmp_file="$g_output_tmp_file.xls" ;;
+	esac
 
 	cat >$g_param_file <<EOF
-#	
-# data file containing mz intensity peak pairs (one per line)	
-#	
+#
+# data file containing mz intensity peak pairs (one per line)
+#
 PeakListPath = $g_spectrum_file
 #
-# Database parameters -> how to retrieve candidates	
-#	
+# Database parameters -> how to retrieve candidates
+#
 MetFragDatabaseType = $database
-NeutralPrecursorMolecularFormula = C9H11Cl3NO3PS	
-NeutralPrecursorMass = 348.926284	
-#	
-# peak matching parameters	
-#	
-FragmentPeakMatchAbsoluteMassDeviation = 0.001	
-FragmentPeakMatchRelativeMassDeviation = 5	
-PrecursorIonMode = 1	
-IsPositiveIonMode = $mode
-#	
-# scoring parameters	
-#	
-MetFragScoreTypes = FragmenterScore	
-MetFragScoreWeights = 1.0	
-#	
-# output	
-# SDF, XLS, CSV, ExtendedXLS, ExtendedFragmentsXLS	
-#	
+$database_search_param
+NeutralPrecursorMass = $g_precursor_neutral_mass
+#
+# peak matching parameters
+#
+FragmentPeakMatchAbsoluteMassDeviation = 0.001
+FragmentPeakMatchRelativeMassDeviation = 5
+PrecursorIonMode = $mode
+IsPositiveIonMode = $posmode
+#
+# scoring parameters
+#
+MetFragScoreTypes = FragmenterScore
+MetFragScoreWeights = 1.0
+#
+# output
+# SDF, XLS, CSV, ExtendedXLS, ExtendedFragmentsXLS
+#
 MetFragCandidateWriter = $writer
 SampleName = $output_file_name
 ResultsPath = $output_file_dir
-#	
-# following parameteres can be kept as they are	
-#	
-MaximumTreeDepth = 2	
-MetFragPreProcessingCandidateFilter = UnconnectedCompoundFilter	
-MetFragPostProcessingCandidateFilter = InChIKeyFilter	
+#
+# following parameteres can be kept as they are
+#
+MaximumTreeDepth = 2
+MetFragPreProcessingCandidateFilter = UnconnectedCompoundFilter
+MetFragPostProcessingCandidateFilter = InChIKeyFilter
 # NumberThreads = 1
 EOF
 }
@@ -170,17 +178,18 @@ function call_metfrag {
 
 read_args "$@"
 
-# Create output temp file
-g_output_tmp_file=$(mktemp -t metfrag.output.XXXXXX)
-
 if [ -n "$g_generate_param_file" ] ; then
+
+	# Create output temp file
+	g_output_tmp_file=$(mktemp -t metfrag.output.XXXXXX)
+
 	[ -n "$g_param_file" ] || g_param_file=$(mktemp -t metfrag.XXXXXX)
 	create_param_file
 	call_metfrag
 	[ -z "$g_keep_generated_param_file" ] && rm $g_param_file
+
+	# Rename output temp file
+	mv $g_output_tmp_file $g_output_file
 else
 	call_metfrag
 fi
-
-# Rename output temp file
-mv $g_output_tmp_file $g_output_file
