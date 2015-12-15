@@ -13,9 +13,16 @@ MSNEG=neg
 
 DBPUBCHEM=pubchem
 DBKEGG=kegg
+DBCHEMSPIDER=chemspider
 
 OUTTYPECSV=csv
 OUTTYPEXLS=xls
+
+####################
+# GLOBAL VARIABLES #
+####################
+
+CHEMSPIDER_TOKEN=
 
 #########
 # ERROR #
@@ -57,6 +64,7 @@ function read_args {
 			--relative-mass-deviation) g_relative_mass_deviation=$(get_opt_val $1 $2) ; shift ;;
 			-s|--spectrum|--spectrum-file) g_spectrum_file=$(get_opt_val $1 $2) ; shift ;;
 			-o|--output-file) g_output_file=$(get_opt_val $1 $2) ; shift ;;
+			-k|--chemspider-security-token) CHEMSPIDER_TOKEN=$(get_opt_val $1 $2) ; shift ;;
 			-?*) error "Unknown option \"$1\"." ;;
 			*) break
 		esac
@@ -66,7 +74,8 @@ function read_args {
 	# Check parameters
 	if [ -n "$g_generate_param_file" ] ; then
 		[ -n "$g_db" ] || error "You must select a database through -d option."
-		[ "$g_db" = "$DBPUBCHEM" -o "$g_db" = "$DBKEGG" ] || error "The database must be one of \"$DBKEGG\" or \"$DBPUBCHEM\"."
+		[ "$g_db" = "$DBPUBCHEM" -o "$g_db" = "$DBKEGG" -o "$g_db" = "$DBCHEMSPIDER" ] || error "The database must be one of \"$DBKEGG\", \"$DBPUBCHEM\" or \"$CHEMSPIDER\"."
+		[ "$g_db" != "$DBCHEMSPIDER" -o -n "$CHEMSPIDER_TOKEN" ] || error "You must provide a security token through -k option when using database ChemSpider."
 		[ -n "$g_spectrum_file" ] || error "You must specify a spectrum file through -s option."
 		[ -f "$g_spectrum_file" ] || error "Cannot find the spectrum file \"$g_spectrum_file\"."
 		[ -n "$g_mode" ] || error "You must specify an MS mode through -m option."
@@ -98,6 +107,7 @@ function create_param_file {
 	case $g_db in
 		$DBPUBCHEM) database=PubChem ;;
 		$DBKEGG) database=KEGG ;;
+		$DBCHEMSPIDER) database=ChemSpider ;;
 	esac
 
 	# Database search param
@@ -124,6 +134,12 @@ function create_param_file {
 		$OUTTYPEXLS) g_output_tmp_file="$g_output_tmp_file.xls" ;;
 	esac
 
+	# ChemSpider security token
+	chemspider_token=\#
+	if [ -n "$CHEMSPIDER_TOKEN" ] ; then
+		chemspider_token="ChemSpiderToken = $CHEMSPIDER_TOKEN"
+	fi
+
 	cat >$g_param_file <<EOF
 #
 # data file containing mz intensity peak pairs (one per line)
@@ -135,6 +151,7 @@ PeakListPath = $g_spectrum_file
 MetFragDatabaseType = $database
 $database_search_param
 NeutralPrecursorMass = $g_precursor_neutral_mass
+$chemspider_token
 #
 # peak matching parameters
 #
