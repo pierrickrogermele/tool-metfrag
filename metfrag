@@ -25,6 +25,11 @@ OUTTYPEXLS=xls
 CHEMSPIDER_TOKEN=
 
 FILTER=yes
+NEUTRAL_PRECURSOR_MASS=
+IONIZED_PRECURSOR_MASS=
+
+GENERATE_FROM_FILE=yes
+KEEP_GENERATED_PARAM_FILE=
 
 #########
 # ERROR #
@@ -52,16 +57,14 @@ function get_opt_val {
 
 function read_args {
 
-	g_generate_param_file=yes
-	g_keep_generated_param_file=
-
 	while true ; do
 		case $1 in
-			-f|--file|--param-file) g_param_file=$(get_opt_val $1 $2) ; g_generate_param_file= ; shift ;;
-			--output-param-file) g_param_file=$(get_opt_val $1 $2) ; g_keep_generated_param_file=yes ; shift ;;
+			-f|--file|--param-file) g_param_file=$(get_opt_val $1 $2) ; GENERATE_FROM_FILE= ; shift ;;
+			--output-param-file) g_param_file=$(get_opt_val $1 $2) ; KEEP_GENERATED_PARAM_FILE=yes ; shift ;;
 			-d|--db|--database) g_db=$(get_opt_val $1 $2) ; shift ;;
 			-m|--mode) g_mode=$(get_opt_val $1 $2) ; shift ;;
-			--precursor-neutral-mass) g_precursor_neutral_mass=$(get_opt_val $1 $2) ; shift ;;
+			--precursor-neutral-mass) NEUTRAL_PRECURSOR_MASS=$(get_opt_val $1 $2) ; shift ;;
+			--precursor-ionized-mass) IONIZED_PRECURSOR_MASS=$(get_opt_val $1 $2) ; shift ;;
 			--precursor-formula) g_precursor_formula=$(get_opt_val $1 $2) ; shift ;;
 			--relative-mass-deviation) g_relative_mass_deviation=$(get_opt_val $1 $2) ; shift ;;
 			-s|--spectrum|--spectrum-file) g_spectrum_file=$(get_opt_val $1 $2) ; shift ;;
@@ -75,7 +78,7 @@ function read_args {
 	done
 
 	# Check parameters
-	if [ -n "$g_generate_param_file" ] ; then
+	if [ -n "$GENERATE_FROM_FILE" ] ; then
 		[ -n "$g_db" ] || error "You must select a database through -d option."
 		[ "$g_db" = "$DBPUBCHEM" -o "$g_db" = "$DBKEGG" -o "$g_db" = "$DBCHEMSPIDER" ] || error "The database must be one of \"$DBKEGG\", \"$DBPUBCHEM\" or \"$CHEMSPIDER\"."
 		[ "$g_db" != "$DBCHEMSPIDER" -o -n "$CHEMSPIDER_TOKEN" ] || error "You must provide a security token through -k option when using database ChemSpider."
@@ -83,7 +86,8 @@ function read_args {
 		[ -f "$g_spectrum_file" ] || error "Cannot find the spectrum file \"$g_spectrum_file\"."
 		[ -n "$g_mode" ] || error "You must specify an MS mode through -m option."
 		[ "$g_mode" = "$MSPOS" -o "$g_mode" = "$MSNEG" ] || error "MS mode must be either \"$MSPOS\" or \"$MSNEG\"."
-		[ -n "$g_precursor_neutral_mass" ] || error "You must specify a precursor M/Z through --precursor-neutral-mass option."
+		[ -n "$NEUTRAL_PRECURSOR_MASS" -o -n "$IONIZED_PRECURSOR_MASS" ] || error "You must specify a precursor M/Z through either --precursor-neutral-mass or --precursor-ionized-mass option."
+		[ -n "$g_relative_mass_deviation" -o -n "$g_precursor_formula" ] || error "You must specify either the precursor formula (option --precursor-formula) or the relative mass deviation (option --relative-mass-deviation). "
 
 		# Output file
 		[ -n "$g_output_file" ] || error "You must specify an output file through -o option."
@@ -116,6 +120,9 @@ function create_param_file {
 	# Database search param
 	[ -z "$g_precursor_formula" ] || database_search_param="NeutralPrecursorMolecularFormula = $g_precursor_formula"
 	[ -z "$g_relative_mass_deviation" ] || database_search_param="DatabaseSearchRelativeMassDeviation = $g_relative_mass_deviation"
+	neutral_precursor_mass=\#
+	[ -z "NEUTRAL_PRECURSOR_MASS" ] || precursor_mass="NeutralPrecursorMass = $NEUTRAL_PRECURSOR_MASS"
+	[ -z "IONIZED_PRECURSOR_MASS" ] || precursor_mass="IonizedPrecursorMass = $IONIZED_PRECURSOR_MASS"
 	
 	# Get mode tag
 	case $g_mode in
@@ -160,7 +167,7 @@ PeakListPath = $g_spectrum_file
 #
 MetFragDatabaseType = $database
 $database_search_param
-NeutralPrecursorMass = $g_precursor_neutral_mass
+$precursor_mass
 $chemspider_token
 #
 # peak matching parameters
@@ -205,7 +212,7 @@ function call_metfrag {
 
 read_args "$@"
 
-if [ -n "$g_generate_param_file" ] ; then
+if [ -n "$GENERATE_FROM_FILE" ] ; then
 
 	# Create output temp file
 	g_output_tmp_file=$(mktemp -t metfrag.output.XXXXXX)
@@ -213,7 +220,7 @@ if [ -n "$g_generate_param_file" ] ; then
 	[ -n "$g_param_file" ] || g_param_file=$(mktemp -t metfrag.XXXXXX)
 	create_param_file
 	call_metfrag
-	[ -z "$g_keep_generated_param_file" ] && rm $g_param_file
+	[ -z "$KEEP_GENERATED_PARAM_FILE" ] && rm $g_param_file
 
 	# Rename output temp file
 	mv $g_output_tmp_file $g_output_file
