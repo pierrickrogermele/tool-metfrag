@@ -33,11 +33,11 @@ run.metfrag <- function(db, ms.mode, precursor.ionized.mass, relative.mass.devia
 # WRITE METFRAG HTML OUTPUT #
 #############################
 
-write.metfrag.html.output <- function(results, db, file, title = NULL, highlighted.lines = NULL) {
+write.metfrag.html.output <- function(results, db, file, useragent, title = NULL, highlighted.lines = NULL) {
 
 	# Set molecule name when absent
 	if (db == PUBCHEM) {
-		conn <- switch(db, pubchem = PubchemConn$new(useragent = USERAGENT))
+		conn <- switch(db, pubchem = PubchemConn$new(useragent = useragent))
 		noname <- is.na(results[['IUPACName']])
 		results[noname, 'IUPACName'] <- vapply(results[noname, 'Identifier'], function(id) { e <- conn$getEntry(id) ; if (is.null(e)) NA_character_ else e$getName() }, FUN.VALUE = '')
 	}
